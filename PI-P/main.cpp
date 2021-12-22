@@ -4,7 +4,7 @@
 
 int main()
 {
-	cv::Mat image = cv::imread("Images/car.jpeg");
+	cv::Mat image = cv::imread("Images/rectangle.jpg");
 	//Sobel Masks
 	int sMaskx[][3] = { -1, -2, -1,
 						 0, 0, 0,
@@ -31,38 +31,33 @@ int main()
 	
 
 	cv::Mat* imgGray= toGrayscale(image);
-	cv::imwrite("Images/carGray.jpg", *imgGray);
-
 	cv::Mat* imgNet = filtruGaussian(imgGray,3,0.4);
-	cv::imwrite("Images/carGauss.jpg", *imgNet);
-
 	cv::Mat* imgQmask = applyMask(imgNet, qmask, 3);
 	cv::Mat* imgOutSx = applyMask(imgNet, sx, 3);
-	cv::imwrite("Images/carSx.jpg", *imgOutSx);
 	cv::Mat* imgOutSy = applyMask(imgNet, sy, 3);
-	cv::imwrite("Images/carSy.jpg", *imgOutSy);
 	cv::Mat* imgSxy = combineOutlines(imgOutSy, imgOutSx);
-	cv::imwrite("Images/carSxy.jpg", *imgSxy);
-
 	cv::Mat* imgBynSxy = toBinary(imgSxy);
+	
+
 	cv::imwrite("Images/carSxyB.jpg", *imgBynSxy);
 	///cv::Mat* img_my_rectangles = new cv::Mat(*imgSxy);
 	
 	
-	getHoughPeaks(imgBynSxy);
+	cv::Mat* rez=getHoughPeaks(imgBynSxy);
+	cv::imwrite("Images/Detect.jpg", *rez);
 	//rectangle r1(12.50, -9.47, 9.17, 78.63);
 	//r1.printVarfuri();
 	
 	//int *rez=
 
-	std::string windowName1 = "ImgFGauss"; //Name of the window
-	std::string windowName2 = "ImgFGaussByn";
+	std::string windowName1 = "Contur"; //Name of the window
+	std::string windowName2 = "Detectie";
 
 	cv::namedWindow(windowName1); // Create a window
 	cv::namedWindow(windowName2);
 	
-	cv::imshow(windowName2, *imgNet); // Show our image inside the created window.
-	cv::imshow(windowName1, *imgBynSxy);
+	cv::imshow(windowName2, *imgBynSxy); // Show our image inside the created window.
+	cv::imshow(windowName1, *rez);
 
 	cv::waitKey(0); // Wait for any keystroke in the window
 

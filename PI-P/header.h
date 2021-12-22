@@ -34,5 +34,6 @@ cv::Mat* filtruGaussian(cv::Mat* img, int n, double gamma);
 cv::Mat* contrastImage(cv::Mat* img, int a, int b, int s_a, int s_b);
 cv::Mat* combineOutlines(cv::Mat* sy, cv::Mat* sx);
 int getMaxTeta(std::map<int, int>& v);
-void getHoughPeaks(cv::Mat* img);
+cv::Mat* getHoughPeaks(cv::Mat* img);
 double getCircleEq(int x1, int y1, int x, int y);
+int ecDreapta(double xA, double yA, double xB, double yB, double x);

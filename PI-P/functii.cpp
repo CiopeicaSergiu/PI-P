@@ -339,7 +339,7 @@ cv::Mat* contrastImage(cv::Mat* img, int a, int b, int s_a, int s_b)
 	{
 		int* rez = new int[2];
 
-		rez[0] = (int)round((p2*cos(teta1)  - p1*cos(teta2))/ sin(teta2 - teta1));//y
+		rez[0] = (int)round((p2 * cos(teta1) - p1 * cos(teta2))/sin(teta2 - teta1));//y
 		rez[1] = (int)round((p2 * sin(teta1) - p1 * sin(teta2))/ sin(teta1 - teta2));//x
 		return rez;
 		
@@ -354,26 +354,45 @@ cv::Mat* contrastImage(cv::Mat* img, int a, int b, int s_a, int s_b)
 
 	double getCircleEq(int x1, int y1, int x, int y)
 	{
-		return (x - x1) * (x - x1) - (y - y1) * (y - y1);
+		return (x - x1) * (x - x1) + (y - y1) * (y - y1);
 	}
 
 
-	void getHoughPeaks(cv::Mat* img)
+	int ecDreapta(double xA, double yA, double xB, double yB, double x)
 	{
+		return (int)round((yB-yA) / (xB-xA) * (x - xA) + yA);
+	}
+
+	cv::Mat* getHoughPeaks(cv::Mat* img)
+	{
+
+		int nr_lines = 0;
+
+		std::cout << "\h: " << img->rows;
+		std::cout << "\w: " << img->cols;
+		std::cout << std::endl;
 		std::map<double, std::map<int, int>>* v;
 		std::map<int, int>* lines;
 		std::map<double, double>* P;
 
 		unsigned char* imgData = (unsigned char*)img->data;
+		
+		cv::Mat* rez = new cv::Mat();
+		cv::cvtColor(*img, *rez, cv::COLOR_GRAY2BGR);
+		int ch = rez->channels();
+		unsigned char* rezData = (unsigned char*)rez->data;
+		
+
 
 		int h = img->rows;
 		int w = img->cols;
 		double p;
+		int Dmin =45;
 		
-		int Dmax=300;
-		int Dmin =Dmax/10;
+		int Dmax=54;
+		
 		int Rmax = Dmax / 2;
-		int Rmin = Dmin / 2;
+		int Rmin = Dmin/2;
 		int y_v;
 		int x_v;
 		double aux;
@@ -387,16 +406,20 @@ cv::Mat* contrastImage(cv::Mat* img, int a, int b, int s_a, int s_b)
 
 		int nr = 0;
 		double delta_alfa, T_alfa = 10;
+		int minL = 14;
+		bool flag3;
+		int pas = 1;
 
 
+		double pmax = 98;
 
 		for (int y = Rmax; y < h-Rmax; y++)
-			for (int x = Rmax; x < w - Rmax; x++)
+			for (int x = Rmax; x < w-Rmax ; x++)
 			{
 				v=new std::map<double, std::map<int, int>>;
-				lines = new std::map<int, int>;
-				P= new std::map<double, double>;
-
+				
+				flag3 = false;
+				
 				for (int t = -Rmax; t <= Rmax; t++)
 					for (int s = -Rmax; s <= Rmax; s++)
 					{
@@ -405,23 +428,33 @@ cv::Mat* contrastImage(cv::Mat* img, int a, int b, int s_a, int s_b)
 						if (imgData[y_v * w + x_v])
 						{
 							aux = getCircleEq(x, y, x_v, y_v);
-							if ( aux>= Rmin&& aux<=Rmax)
+							if ( aux>= Rmin*Rmin&& aux<=Rmax*Rmax)
 								for (int teta = 0; teta <= 180; teta++)
 								{
 									p = (double)x_v * cos(teta) + (double)y_v * sin(teta);
-									++(*v)[(int)round(p)][teta];
+									if(p>=-pmax && p<=pmax)
+										++(*v)[round(p)][teta];
 								}
 						}
 					}
 
-				if(!v->empty())
-				for (auto H = v->begin(); H != v->end(); H++)
-					(*lines)[H->first] = getMaxTeta(H->second);
 
 
-				if(lines->size()>1)
+				if (v->size() >= 4)
+				{
+					lines = new std::map<int, int>;
+					P = new std::map<double, double>;
+					
+					for (auto H = v->begin(); H != v->end(); H++)
+					{
+						(*lines)[H->first] = getMaxTeta(H->second);
+						nr_lines++;
+					
+					}
+
+
 					for (auto Hi = lines->begin(); Hi != --lines->end(); Hi++)
-					{	
+					{
 						auto aux2 = Hi;
 						++aux2;
 						for (auto Hj = aux2; Hj != lines->end(); Hj++)
@@ -431,64 +464,117 @@ cv::Mat* contrastImage(cv::Mat* img, int a, int b, int s_a, int s_b)
 							delta_c = abs((*v)[Hi->first][Hi->second] - (*v)[Hj->first][Hj->second]);
 							ma_c = ((*v)[Hi->first][Hi->second] + (*v)[Hj->first][Hj->second]) / 2;
 
-							if (delta_tau < T0 && delta_p < Tp && delta_c < Tl * ma_c)
+							if (delta_tau < T0 && delta_p < Tp && delta_c < Tl * ma_c && (*v)[Hi->first][Hi->second] >= minL)
 							{
+								epsilon = abs(Hi->first - Hj->first) / 2.0;
+
 								alfa = (Hi->second + Hj->second) / 2.0;
-								epsilon = (Hi->first - Hj->first) / 2.0;
+
 								(*P)[epsilon] = alfa;
 							}
 						}
 					}
 
-				delete v;
-				delete lines;
-
-				if(P->size()>1)
-					for (auto Pk = P->begin(); Pk != --P->end(); Pk++)
-					{
-						auto aux2 = Pk;
-						++aux2;
-						for (auto Pl = aux2; Pl != P->end(); Pl++)
+					
+					
+					if (P->size() >=2)
+						for (auto Pk = P->begin(); Pk != --P->end(); Pk++)
 						{
-							delta_alfa = abs(abs(Pk->second - Pl->second) - 90);
-							if (delta_alfa < T_alfa)
+							auto aux2 = Pk;
+							++aux2;
+
+							for (auto Pl = aux2; Pl != P->end(); Pl++)
 							{
-								//int* getIntLines(double p1, double teta1, double p2, double teta2)
-								int* v1 = getIntLines(-Pk->first, Pk->second, -Pl->first, Pl->second);
-								int* v4 = getIntLines(-Pk->first, Pk->second, Pl->first, Pl->second);
-								int* v2 = getIntLines(Pk->first, Pk->second, Pl->first, Pl->second);
-								int* v3 = getIntLines(Pk->first, Pk->second, -Pl->first, Pl->second);
-								for (int i = 0; i < 2; i++)
+								delta_alfa = abs(abs(Pk->second - Pl->second) - 90);
+								if (delta_alfa < T_alfa)
 								{
-									v1[0] += y;
-									v2[0] += y;
-									v3[0] += y;
-									v4[0] += y;
+									int* Varfuri[4];
+									//int* getIntLines(double p1, double teta1, double p2, double teta2)
+									Varfuri[0] = getIntLines(-Pl->first, Pl->second, -Pk->first, Pk->second);
+									Varfuri[1] = getIntLines(-Pl->first, Pl->second, Pk->first, Pk->second);
+									Varfuri[2] = getIntLines(Pl->first, Pl->second, Pk->first, Pk->second);
+									Varfuri[3] = getIntLines(Pl->first, Pl->second, -Pk->first, Pk->second);
 
-									v1[1] += x;
-									v2[1] += x;
-									v3[1] += x;
-									v4[1] += x;
+									for (int i = 0; i < 4; i++)
+									{
+										Varfuri[i][0] += y;
+										Varfuri[i][1] += x;
+									}
+									
+
+									bool flag = true;
+
+									for (int i = 0; i < 4; i++)
+										if (Varfuri[i][0] >= h || Varfuri[i][0] < 0 || Varfuri[i][1] < 0 || Varfuri[i][1] >= w)
+										{
+											flag = false;
+											break;
+										}
+
+									if (flag)
+									{
+										
+										std::cout << "\nRectangle: ";
+
+
+										std::cout << "\nUnghi: " << Pk->second;
+										std::cout << "\nv1: (y: " << Varfuri[0][0] << ",x: " << Varfuri[0][1] << ")";
+										std::cout << "\nv2: (y: " << Varfuri[1][0] << ",x: " << Varfuri[1][1] << ")";
+										std::cout << "\nv3: (y: " << Varfuri[2][0] << ",x: " << Varfuri[2][1] << ")";
+										std::cout << "\nv4: (y: " << Varfuri[3][0] << ",x: " << Varfuri[3][1] << ")\n\n";
+
+
+										for (int i = 0; i < 4; i++)
+										{
+											int startX = Varfuri[i][1];
+											int stopX = Varfuri[(i + 1) % 4][1];
+											int startY = Varfuri[i][0];
+											int stopY = Varfuri[(i + 1) % 4][0];
+											if (startX > stopX)
+											{
+												int aux = startX;
+												startX = stopX;
+												stopX = aux;
+
+												aux = startY;
+												startY = stopY;
+												stopY = aux;
+											}
+
+											for (int x_r = startX; x_r <= stopX; x_r++)
+											{
+												int aux4 = ecDreapta(startX, startY, stopX, stopY, x_r);
+												rezData[(aux4 * w + x_r) * ch] = 0;
+												rezData[(aux4 * w + x_r) * ch + 1] = 0;
+												rezData[(aux4 * w + x_r) * ch + 2] = 255;
+											}
+
+
+										}
+
+
+									}
+
+
+
+
+
+
+
+									for (int i = 0; i < 4; i++)
+										delete[] Varfuri[i];
+
+
 								}
-
-								std::cout << "\nRectangle: ";
-
-								std::cout << "\nv1: (y: " << v1[0] << ",x: " << v1[1] << ")";
-								std::cout << "\nv2: (y: " << v2[0] << ",x: " << v2[1] << ")";
-								std::cout << "\nv3: (y: " << v3[0] << ",x: " << v3[1] << ")";
-								std::cout << "\nv4: (y: " << v4[0] << ",x: " << v4[1] << ")";
-
-
-
-								std::cout << std::endl << std::endl;
-								delete[] v1;
-								delete[] v2;
-								delete[] v3;
-								delete[] v4;
-
 							}
 						}
-					}
-				delete P;
+					delete P;
+					delete lines;
+				}
+					
+				delete v;
+				
 			}
+			std::cout << "\nNr_lines: " << nr_lines << "\n";
+			return rez;
 		}
